@@ -2,18 +2,21 @@ import { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 
+const API_BASE_URL = 'https://www.nordpoolgroup.com/api/marketdata/page/10';
+
 const fetchElectricityPrices = async (timeRange) => {
   const today = new Date();
   const endDate = today.toISOString().split('T')[0];
   const startDate = new Date(today.setDate(today.getDate() - parseInt(timeRange))).toISOString().split('T')[0];
   
-  const url = `https://www.nordpoolgroup.com/api/marketdata/page/10?currency=SEK,SEK,SEK,SEK&endDate=${endDate}&startDate=${startDate}`;
+  const url = `${API_BASE_URL}?currency=SEK,SEK,SEK,SEK&endDate=${endDate}&startDate=${startDate}`;
   
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Network response was not ok');
-  }
-  const data = await response.json();
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error('Failed to fetch data');
+    }
+    const data = await response.json();
   
   // Process the data to extract prices for SE3 (Stockholm area)
   return data.data.Rows
@@ -33,8 +36,8 @@ const ElectricityPriceGraph = () => {
     refetchInterval: 24 * 60 * 60 * 1000, // Refetch every 24 hours
   });
 
-  if (isLoading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error.message}</div>;
+  if (isLoading) return <div className="text-center py-10">Loading electricity price data...</div>;
+  if (error) return <div className="text-center py-10 text-red-500">Error loading data: {error.message}</div>;
 
   return (
     <div className="w-full max-w-4xl mx-auto">
