@@ -7,7 +7,21 @@ const API_BASE_URL = 'https://www.nordpoolgroup.com/api/marketdata/page/10';
 const fetchElectricityPrices = async (timeRange) => {
   const today = new Date();
   const endDate = today.toISOString().split('T')[0];
-  const startDate = new Date(today.setDate(today.getDate() - parseInt(timeRange))).toISOString().split('T')[0];
+  let startDate;
+
+  switch (timeRange) {
+    case '7d':
+      startDate = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      break;
+    case '30d':
+      startDate = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      break;
+    case '90d':
+      startDate = new Date(today.getTime() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      break;
+    default:
+      throw new Error('Invalid time range');
+  }
   
   const url = `${API_BASE_URL}?currency=SEK,SEK,SEK,SEK&endDate=${endDate}&startDate=${startDate}`;
   
@@ -18,13 +32,17 @@ const fetchElectricityPrices = async (timeRange) => {
     }
     const data = await response.json();
   
-  // Process the data to extract prices for SE3 (Stockholm area)
-  return data.data.Rows
-    .filter(row => row.IsExtraRow === false)
-    .map(row => ({
-      date: row.StartTime.split('T')[0],
-      price: parseFloat(row.Columns.find(col => col.Name === 'SE3').Value.replace(',', '.'))
-    }));
+    // Process the data to extract prices for SE3 (Stockholm area)
+    return data.data.Rows
+      .filter(row => row.IsExtraRow === false)
+      .map(row => ({
+        date: row.StartTime.split('T')[0],
+        price: parseFloat(row.Columns.find(col => col.Name === 'SE3').Value.replace(',', '.'))
+      }));
+  } catch (error) {
+    console.error('Error fetching electricity prices:', error);
+    throw error;
+  }
 };
 
 const ElectricityPriceGraph = () => {
@@ -32,12 +50,9 @@ const ElectricityPriceGraph = () => {
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['electricityPrices', timeRange],
-    queryFn: fetchElectricityPrices,
+    queryFn: () => fetchElectricityPrices(timeRange),
     refetchInterval: 24 * 60 * 60 * 1000, // Refetch every 24 hours
   });
-
-  if (isLoading) return <div className="text-center py-10">Loading electricity price data...</div>;
-  if (error) return <div className="text-center py-10 text-red-500">Error loading data: {error.message}</div>;
 
   return (
     <div className="w-full max-w-4xl mx-auto">
@@ -62,15 +77,21 @@ const ElectricityPriceGraph = () => {
           90 Days
         </button>
       </div>
-      <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="date" />
-          <YAxis />
-          <Tooltip />
-          <Line type="monotone" dataKey="price" stroke="#8884d8" />
-        </LineChart>
-      </ResponsiveContainer>
+      {isLoading ? (
+        <div className="text-center py-10">Loading electricity price data...</div>
+      ) : error ? (
+        <div className="text-center py-10 text-red-500">Error loading data: {error.message}</div>
+      ) : (
+        <ResponsiveContainer width="100%" height={400}>
+          <LineChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="price" stroke="#8884d8" />
+          </LineChart>
+        </ResponsiveContainer>
+      )}
     </div>
   );
 };
