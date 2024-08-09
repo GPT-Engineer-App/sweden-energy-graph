@@ -2,13 +2,26 @@ import { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useQuery } from '@tanstack/react-query';
 
-const fetchElectricityPrices = async () => {
-  // This is a placeholder URL. Replace with the actual API endpoint
-  const response = await fetch('https://api.example.com/electricity-prices');
+const fetchElectricityPrices = async (timeRange) => {
+  const today = new Date();
+  const endDate = today.toISOString().split('T')[0];
+  const startDate = new Date(today.setDate(today.getDate() - parseInt(timeRange))).toISOString().split('T')[0];
+  
+  const url = `https://www.nordpoolgroup.com/api/marketdata/page/10?currency=SEK,SEK,SEK,SEK&endDate=${endDate}&startDate=${startDate}`;
+  
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error('Network response was not ok');
   }
-  return response.json();
+  const data = await response.json();
+  
+  // Process the data to extract prices for SE3 (Stockholm area)
+  return data.data.Rows
+    .filter(row => row.IsExtraRow === false)
+    .map(row => ({
+      date: row.StartTime.split('T')[0],
+      price: parseFloat(row.Columns.find(col => col.Name === 'SE3').Value.replace(',', '.'))
+    }));
 };
 
 const ElectricityPriceGraph = () => {
